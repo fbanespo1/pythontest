@@ -5,6 +5,7 @@ from langchain_community.chat_models import ChatOpenAI, BedrockChat
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.schema import HumanMessage
+import json
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,9 @@ else:  # AWS Bedrock models
     aws_secret_key = st.sidebar.text_input("AWS Secret Key", type="password")
     aws_region = st.sidebar.text_input("AWS Region", value="us-east-1")
 
+# Debug mode
+debug_mode = st.sidebar.checkbox("Enable Debug Mode")
+
 # Initialize the selected model
 try:
     if model_option == "OpenAI GPT-4":
@@ -45,11 +49,11 @@ try:
         if model_option == "AWS Bedrock Claude":
             model_id = "anthropic.claude-v2"
         elif model_option == "AWS Bedrock Mistral":
-            model_id = "mistral.mistral-7b-instruct-v0:2"  # Verify this model ID
+            model_id = "mistral.mistral-7b-instruct-v0:2"
         elif model_option == "AWS Bedrock Llama":
-            model_id = "meta.llama3-70b-instruct-v1:0"  # Verify this model ID
+            model_id = "meta.llama3-70b-instruct-v1:0"
         
-        llm = BedrockChat(model_id=model_id, region_name=aws_region)
+        llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs={"temperature": 0.1, "max_tokens": 500})
 
     # Define tools
     tools = [
@@ -81,32 +85,27 @@ try:
                     if model_option == "OpenAI GPT-4":
                         response = agent.run(user_input)
                     else:  # AWS Bedrock models
-                        response = llm([HumanMessage(content=f"Analyze and fix this Python code: {user_input}")])
-                        response = response.content
-                    st.success("Model Response:")
-                    st.markdown(f"### Result:\n{response}")
+                        messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
+                        response = llm(messages)
+                        if debug_mode:
+                            st.json(json.loads(str(response)))
+                        response = response.content if hasattr(response, 'content') else str(response)
+                    
+                    if response.strip():
+                        st.success("Model Response:")
+                        st.markdown(f"### Result:\n{response}")
+                    else:
+                        st.warning("The model did not provide a response. This might be due to API limitations or the complexity of the query.")
             except Exception as e:
                 st.error(f"Error processing: {str(e)}")
+                if debug_mode:
+                    st.exception(e)
         else:
             st.warning("Please enter a query before submitting.")
 
 except Exception as e:
     st.error(f"Error initializing the model: {str(e)}")
+    if debug_mode:
+        st.exception(e)
 
-st.markdown("""
-### Features:
-- **Multiple Language Models**: Choose between OpenAI GPT-4, AWS Bedrock Claude, Mistral, and Llama.
-- **Python Code Analysis**: Get insights and fixes for your Python code.
-- **Flexible Querying**: Ask questions or input code for analysis.
-
-### Security Note:
-- Your API keys are used only for this session and are not stored.
-- Ensure to keep your API keys private and do not share them.
-""")
-
-# Instructions for obtaining API keys
-st.sidebar.markdown("""
-### How to obtain API keys:
-- OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
-- AWS Credentials: [AWS Console](https://aws.amazon.com/)
-""")
+# ... (rest of your code remains the same)
