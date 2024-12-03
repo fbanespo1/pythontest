@@ -5,7 +5,6 @@ from langchain_community.chat_models import ChatOpenAI, BedrockChat
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.schema import HumanMessage
-import json
 
 # Load environment variables
 load_dotenv()
@@ -53,7 +52,7 @@ try:
             model_id = "mistral.mistral-7b-instruct-v0:2"
             model_kwargs = {"temperature": 0.1, "max_tokens": 500}
         elif model_option == "AWS Bedrock Llama":
-            model_id = "meta.llama3-70b-instruct-v1:0"
+            model_id = "meta.llama2-70b-chat-v1"
             model_kwargs = {"temperature": 0.1, "max_gen_len": 500}
         
         llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs=model_kwargs)
@@ -89,10 +88,26 @@ try:
                         response = agent.run(user_input)
                     else:  # AWS Bedrock models
                         messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
-                        response = llm(messages)
-                        if debug_mode:
-                            st.json(json.loads(str(response)))
-                        response = response.content if hasattr(response, 'content') else str(response)
+                        try:
+                            response = llm(messages)
+                            if debug_mode:
+                                st.text("Raw Response:")
+                                st.code(str(response), language="text")
+                            
+                            if hasattr(response, 'content'):
+                                response = response.content
+                            elif isinstance(response, dict) and 'content' in response:
+                                response = response['content']
+                            else:
+                                response = str(response)
+                            
+                            if not response.strip():
+                                st.warning("The model returned an empty response. This might be due to API limitations or the complexity of the query.")
+                        except Exception as e:
+                            st.error(f"Error with Bedrock model: {str(e)}")
+                            if debug_mode:
+                                st.exception(e)
+                            response = ""
                     
                     if response.strip():
                         st.success("Model Response:")
@@ -128,5 +143,3 @@ st.sidebar.markdown("""
 - OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
 - AWS Credentials: [AWS Console](https://aws.amazon.com/)
 """)
-
-
