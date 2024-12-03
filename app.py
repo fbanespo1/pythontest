@@ -52,7 +52,7 @@ try:
             model_id = "mistral.mistral-7b-instruct-v0:2"
             model_kwargs = {"temperature": 0.1, "max_tokens": 500}
         elif model_option == "AWS Bedrock Llama":
-            model_id = "meta.llama2-70b-chat-v1"
+            model_id = "meta.llama3-70b-instruct-v1:0"
             model_kwargs = {"temperature": 0.1, "max_gen_len": 500}
         
         llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs=model_kwargs)
