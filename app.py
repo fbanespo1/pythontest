@@ -47,7 +47,7 @@ try:
         elif model_option == "AWS Bedrock Mistral":
             model_id = "mistral.mistral-7b-instruct-v0:2"  # Verify this model ID
         elif model_option == "AWS Bedrock Llama":
-            model_id = "meta.llama3-2-3b-instruct-v1:0"  # Verify this model ID
+            model_id = "meta.llama3-1-70b-instruct-v1:0"  # Verify this model ID
         
         llm = BedrockChat(model_id=model_id, region_name=aws_region)
 
