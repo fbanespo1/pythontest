@@ -7,3 +7,4 @@ langchain_experimental
 boto3 
 anthropic 
 huggingface_hub
+langfuse
