@@ -6,7 +6,9 @@ from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.schema import HumanMessage
 from langchain.callbacks import StreamlitCallbackHandler
-from langfuse.callback import LangfuseCallbackHandler  # Corrected import
+from langfuse import Langfuse
+from langfuse.decorators import observe
+from langfuse.openai import openai  # OpenAI integration
 
 # Load environment variables
 load_dotenv()
@@ -36,19 +38,23 @@ langchain_project = st.sidebar.text_input("LangChain Project", value="default")
 langchain_tracing_v2 = st.sidebar.checkbox("Enable LangChain Tracing V2")
 
 # Langfuse configuration
-langfuse_api_key = st.sidebar.text_input("Langfuse API Key", type="password")
+st.sidebar.header("Langfuse Configuration")
+langfuse_public_key = st.sidebar.text_input("Langfuse Public Key", type="password")
+langfuse_secret_key = st.sidebar.text_input("Langfuse Secret Key", type="password")
 langfuse_host = st.sidebar.text_input("Langfuse Host", value="https://cloud.langfuse.com")
 
 # Debug mode
 debug_mode = st.sidebar.checkbox("Enable Debug Mode")
 
-# Initialize Langfuse callback
-langfuse_callback = None
-if langfuse_api_key:
-    langfuse_callback = LangfuseCallbackHandler(
-        api_key=langfuse_api_key,
-        host=langfuse_host,
+# Initialize Langfuse
+if langfuse_public_key and langfuse_secret_key:
+    langfuse = Langfuse(
+        public_key=langfuse_public_key,
+        secret_key=langfuse_secret_key,
+        host=langfuse_host
     )
+else:
+    langfuse = None
 
 # Initialize the selected model
 try:
@@ -56,22 +62,46 @@ try:
         if not api_key:
             st.error("Please enter your OpenAI API Key.")
             st.stop()
-        llm = ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=api_key)
+        openai.api_key = api_key  # Set OpenAI API key
+
+        @observe()
+        def get_openai_response(user_input):
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "user", "content": user_input}
+                ],
+                max_tokens=500,
+                temperature=0
+            )
+            return response.choices[0].message.content
+
     else:  # AWS Bedrock models
         if not aws_access_key or not aws_secret_key:
             st.error("Please enter your AWS credentials.")
             st.stop()
         os.environ["AWS_ACCESS_KEY_ID"] = aws_access_key
         os.environ["AWS_SECRET_ACCESS_KEY"] = aws_secret_key
-        
+
         if model_option == "AWS Bedrock Claude":
             model_id = "anthropic.claude-v2"
             model_kwargs = {"temperature": 0.1, "max_tokens_to_sample": 500}
         elif model_option == "AWS Bedrock Mistral":
             model_id = "mistral.mistral-7b-instruct-v0:2"
             model_kwargs = {"temperature": 0.1, "max_tokens": 500}
-        
+
         llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs=model_kwargs)
+
+        @observe()
+        def get_bedrock_response(user_input):
+            messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
+            response = llm(messages)
+            if hasattr(response, 'content'):
+                return response.content
+            elif isinstance(response, dict) and 'content' in response:
+                return response['content']
+            else:
+                return str(response)
 
     # Define tools
     tools = [
@@ -84,9 +114,10 @@ try:
 
     # Initialize agent (only for OpenAI)
     if model_option == "OpenAI GPT-4":
+        agent_llm = ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=api_key)
         agent = initialize_agent(
             tools=tools,
-            llm=llm,
+            llm=agent_llm,
             agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True,
             handle_parsing_errors=True
@@ -108,36 +139,14 @@ try:
             try:
                 with st.spinner("Analyzing..."):
                     if model_option == "OpenAI GPT-4":
-                        response = agent.run(
-                            user_input, 
-                            callbacks=[StreamlitCallbackHandler(st.container()), langfuse_callback]
-                        )
+                        if 'agent' in locals():
+                            # Use the agent if initialized
+                            response = agent.run(user_input)
+                        else:
+                            response = get_openai_response(user_input)
                     else:  # AWS Bedrock models
-                        messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
-                        try:
-                            response = llm(
-                                messages, 
-                                callbacks=[langfuse_callback] if langfuse_callback else None
-                            )
-                            if debug_mode:
-                                st.text("Raw Response:")
-                                st.code(str(response), language="text")
-                            
-                            if hasattr(response, 'content'):
-                                response = response.content
-                            elif isinstance(response, dict) and 'content' in response:
-                                response = response['content']
-                            else:
-                                response = str(response)
-                            
-                            if not response.strip():
-                                st.warning("The model returned an empty response. This might be due to API limitations or the complexity of the query.")
-                        except Exception as e:
-                            st.error(f"Error with Bedrock model: {str(e)}")
-                            if debug_mode:
-                                st.exception(e)
-                            response = ""
-                    
+                        response = get_bedrock_response(user_input)
+
                     if response.strip():
                         st.success("Model Response:")
                         st.markdown(f"### Result:\n{response}")
