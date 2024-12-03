@@ -1,5 +1,3 @@
-import importlib_metadata
-import streamlit
 import os
 import streamlit as st
 from dotenv import load_dotenv
