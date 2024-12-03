@@ -5,6 +5,7 @@ from langchain_community.chat_models import ChatOpenAI, BedrockChat
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.schema import HumanMessage
+from langchain.callbacks import StreamlitCallbackHandler
 
 # Load environment variables
 load_dotenv()
@@ -27,6 +28,11 @@ else:  # AWS Bedrock models
     aws_access_key = st.sidebar.text_input("AWS Access Key", type="password")
     aws_secret_key = st.sidebar.text_input("AWS Secret Key", type="password")
     aws_region = st.sidebar.text_input("AWS Region", value="us-east-1")
+
+# LangSmith configuration
+langchain_api_key = st.sidebar.text_input("LangChain API Key", type="password")
+langchain_project = st.sidebar.text_input("LangChain Project", value="default")
+langchain_tracing_v2 = st.sidebar.checkbox("Enable LangChain Tracing V2")
 
 # Debug mode
 debug_mode = st.sidebar.checkbox("Enable Debug Mode")
@@ -73,6 +79,13 @@ try:
             handle_parsing_errors=True
         )
 
+    # Set LangChain environment variables
+    if langchain_tracing_v2:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+        os.environ["LANGCHAIN_API_KEY"] = langchain_api_key
+        os.environ["LANGCHAIN_PROJECT"] = langchain_project
+
     # User input
     user_input = st.text_area("Enter your Python code or question:", "")
 
@@ -82,7 +95,7 @@ try:
             try:
                 with st.spinner("Analyzing..."):
                     if model_option == "OpenAI GPT-4":
-                        response = agent.run(user_input)
+                        response = agent.run(user_input, callbacks=[StreamlitCallbackHandler(st.container())])
                     else:  # AWS Bedrock models
                         messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
                         try:
@@ -128,6 +141,7 @@ st.markdown("""
 - **Multiple Language Models**: Choose between OpenAI GPT-4, AWS Bedrock Claude, and AWS Bedrock Mistral.
 - **Python Code Analysis**: Get insights and fixes for your Python code.
 - **Flexible Querying**: Ask questions or input code for analysis.
+- **LangSmith Integration**: Track queries and responses for improved analysis.
 
 ### Security Note:
 - Your API keys are used only for this session and are not stored.
@@ -139,4 +153,5 @@ st.sidebar.markdown("""
 ### How to obtain API keys:
 - OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
 - AWS Credentials: [AWS Console](https://aws.amazon.com/)
+- LangChain API Key: [LangSmith](https://smith.langchain.com/)
 """)
