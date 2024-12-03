@@ -55,7 +55,7 @@ try:
         if not huggingface_api_key:
             st.error("Please enter your HuggingFace API Key.")
             st.stop()
-        llm = HuggingFaceHub(repo_id="meta-llama/Llama-3.1-8B", huggingfacehub_api_token=huggingface_api_key)
+        llm = HuggingFaceHub(repo_id="meta-llama/Llama-3.2-1B", huggingfacehub_api_token=huggingface_api_key)
 
     # Define tools
     tools = [
