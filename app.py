@@ -50,7 +50,7 @@ try:
         if not huggingface_api_key:
             st.error("Please enter your HuggingFace API Key.")
             st.stop()
-        llm = HuggingFaceHub(repo_id="mistralai/Mistral-7B-Instruct-v0.1", huggingfacehub_api_token=huggingface_api_key)
+        llm = HuggingFaceHub(repo_id="mistralai/Ministral-8B-Instruct-2410", huggingfacehub_api_token=huggingface_api_key)
     elif model_option == "Llama":
         if not huggingface_api_key:
             st.error("Please enter your HuggingFace API Key.")
