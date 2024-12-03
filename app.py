@@ -1,10 +1,12 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatOpenAI, BedrockChat, ChatAnthropic
+from langchain_community.chat_models import ChatOpenAI, BedrockChat
 from langchain_community.llms import HuggingFaceHub
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
+from langchain.schema import HumanMessage
+from langchain.callbacks import StreamlitCallbackHandler
 
 # Load environment variables
 load_dotenv()
@@ -69,7 +71,8 @@ try:
         tools=tools,
         llm=llm,
         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True
+        verbose=True,
+        handle_parsing_errors=True
     )
 
     # User input
@@ -79,16 +82,24 @@ try:
         if user_input.strip():
             st.info(f"Processing your query using {model_option}...")
             try:
-                response = agent.run(user_input)
-                st.success("Agent Response:")
-                st.markdown(f"### Result:\n{response}")
+                with st.spinner("Analyzing..."):
+                    if model_option == "AWS Bedrock (Claude)":
+                        # Direct call to the model for Bedrock
+                        response = llm([HumanMessage(content=f"Analyze and fix this Python code: {user_input}")])
+                        st.success("Model Response:")
+                        st.markdown(f"### Result:\n{response.content}")
+                    else:
+                        # Use the agent for other models
+                        response = agent.run(user_input)
+                        st.success("Agent Response:")
+                        st.markdown(f"### Result:\n{response}")
             except Exception as e:
-                st.error(f"Error processing: {e}")
+                st.error(f"Error processing: {str(e)}")
         else:
             st.warning("Please enter a query before submitting.")
 
 except Exception as e:
-    st.error(f"Error initializing the model: {e}")
+    st.error(f"Error initializing the model: {str(e)}")
 
 st.markdown("""
 ### Features:
