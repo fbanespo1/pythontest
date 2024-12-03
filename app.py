@@ -48,12 +48,15 @@ try:
         
         if model_option == "AWS Bedrock Claude":
             model_id = "anthropic.claude-v2"
+            model_kwargs = {"temperature": 0.1, "max_tokens_to_sample": 500}
         elif model_option == "AWS Bedrock Mistral":
             model_id = "mistral.mistral-7b-instruct-v0:2"
+            model_kwargs = {"temperature": 0.1, "max_tokens": 500}
         elif model_option == "AWS Bedrock Llama":
-            model_id = "meta.llama3-70b-instruct-v1:0"
+            model_id = "meta.llama2-70b-chat-v1"
+            model_kwargs = {"temperature": 0.1, "max_gen_len": 500}
         
-        llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs={"temperature": 0.1, "max_tokens": 500})
+        llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs=model_kwargs)
 
     # Define tools
     tools = [
@@ -108,4 +111,22 @@ except Exception as e:
     if debug_mode:
         st.exception(e)
 
-# ... (rest of your code remains the same)
+st.markdown("""
+### Features:
+- **Multiple Language Models**: Choose between OpenAI GPT-4, AWS Bedrock Claude, Mistral, and Llama.
+- **Python Code Analysis**: Get insights and fixes for your Python code.
+- **Flexible Querying**: Ask questions or input code for analysis.
+
+### Security Note:
+- Your API keys are used only for this session and are not stored.
+- Ensure to keep your API keys private and do not share them.
+""")
+
+# Instructions for obtaining API keys
+st.sidebar.markdown("""
+### How to obtain API keys:
+- OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
+- AWS Credentials: [AWS Console](https://aws.amazon.com/)
+""")
+
+
