@@ -6,6 +6,7 @@ from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.schema import HumanMessage
 from langchain.callbacks import StreamlitCallbackHandler
+from langfuse.callbacks import LangfuseCallbackHandler  # Import Langfuse callback
 
 # Load environment variables
 load_dotenv()
@@ -34,8 +35,20 @@ langchain_api_key = st.sidebar.text_input("LangChain API Key", type="password")
 langchain_project = st.sidebar.text_input("LangChain Project", value="default")
 langchain_tracing_v2 = st.sidebar.checkbox("Enable LangChain Tracing V2")
 
+# Langfuse configuration
+langfuse_api_key = st.sidebar.text_input("Langfuse API Key", type="password")
+langfuse_host = st.sidebar.text_input("Langfuse Host", value="https://api.langfuse.com")
+
 # Debug mode
 debug_mode = st.sidebar.checkbox("Enable Debug Mode")
+
+# Initialize Langfuse callback
+langfuse_callback = None
+if langfuse_api_key:
+    langfuse_callback = LangfuseCallbackHandler(
+        api_key=langfuse_api_key,
+        host=langfuse_host,
+    )
 
 # Initialize the selected model
 try:
@@ -95,11 +108,17 @@ try:
             try:
                 with st.spinner("Analyzing..."):
                     if model_option == "OpenAI GPT-4":
-                        response = agent.run(user_input, callbacks=[StreamlitCallbackHandler(st.container())])
+                        response = agent.run(
+                            user_input, 
+                            callbacks=[StreamlitCallbackHandler(st.container()), langfuse_callback]
+                        )
                     else:  # AWS Bedrock models
                         messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
                         try:
-                            response = llm(messages)
+                            response = llm(
+                                messages, 
+                                callbacks=[langfuse_callback] if langfuse_callback else None
+                            )
                             if debug_mode:
                                 st.text("Raw Response:")
                                 st.code(str(response), language="text")
@@ -135,23 +154,3 @@ except Exception as e:
     st.error(f"Error initializing the model: {str(e)}")
     if debug_mode:
         st.exception(e)
-
-st.markdown("""
-### Features:
-- **Multiple Language Models**: Choose between OpenAI GPT-4, AWS Bedrock Claude, and AWS Bedrock Mistral.
-- **Python Code Analysis**: Get insights and fixes for your Python code.
-- **Flexible Querying**: Ask questions or input code for analysis.
-- **LangSmith Integration**: Track queries and responses for improved analysis.
-
-### Security Note:
-- Your API keys are used only for this session and are not stored.
-- Ensure to keep your API keys private and do not share them.
-""")
-
-# Instructions for obtaining API keys
-st.sidebar.markdown("""
-### How to obtain API keys:
-- OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
-- AWS Credentials: [AWS Console](https://aws.amazon.com/)
-- LangChain API Key: [LangSmith](https://smith.langchain.com/)
-""")
