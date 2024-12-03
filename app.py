@@ -1,39 +1,59 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI, BedrockChat, ChatAnthropic
+from langchain_community.llms import HuggingFaceHub
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 
-# Load environment variables (for default values)
+# Load environment variables
 load_dotenv()
 
 # Streamlit configuration
-st.set_page_config(page_title="Python Code Tester Agent", layout="wide")
-st.title("Python Code Tester Agent")
+st.set_page_config(page_title="Multi-Model Python Code Tester", layout="wide")
+st.title("Multi-Model Python Code Tester")
 
-# API Key input in sidebar
+# Model selection
+model_option = st.sidebar.selectbox(
+    "Choose Language Model",
+    ("OpenAI GPT-4", "AWS Bedrock (Claude)", "Mistral", "Llama")
+)
+
+# API Key inputs
 st.sidebar.header("API Configuration")
-openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
-langchain_api_key = st.sidebar.text_input("LangChain API Key", type="password")
+if model_option == "OpenAI GPT-4":
+    api_key = st.sidebar.text_input("OpenAI API Key", type="password")
+elif model_option == "AWS Bedrock (Claude)":
+    aws_access_key = st.sidebar.text_input("AWS Access Key", type="password")
+    aws_secret_key = st.sidebar.text_input("AWS Secret Key", type="password")
+    aws_region = st.sidebar.text_input("AWS Region", value="us-east-1")
+elif model_option in ["Mistral", "Llama"]:
+    huggingface_api_key = st.sidebar.text_input("HuggingFace API Key", type="password")
 
-# Other configuration inputs
-langchain_tracing_v2 = st.sidebar.checkbox("Enable LangChain Tracing V2")
-langchain_endpoint = st.sidebar.text_input("LangChain Endpoint", value="https://api.smith.langchain.com")
-langchain_project = st.sidebar.text_input("LangChain Project")
-
-# Validate OpenAI API key
-if not openai_api_key:
-    st.error("Please enter your OpenAI API Key.")
-    st.stop()
-
-# Initialize OpenAI model
+# Initialize the selected model
 try:
-    llm = ChatOpenAI(
-        temperature=0,
-        model="gpt-4",
-        openai_api_key=openai_api_key
-    )
+    if model_option == "OpenAI GPT-4":
+        if not api_key:
+            st.error("Please enter your OpenAI API Key.")
+            st.stop()
+        llm = ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=api_key)
+    elif model_option == "AWS Bedrock (Claude)":
+        if not aws_access_key or not aws_secret_key:
+            st.error("Please enter your AWS credentials.")
+            st.stop()
+        os.environ["AWS_ACCESS_KEY_ID"] = aws_access_key
+        os.environ["AWS_SECRET_ACCESS_KEY"] = aws_secret_key
+        llm = BedrockChat(model_id="anthropic.claude-v2", region_name=aws_region)
+    elif model_option == "Mistral":
+        if not huggingface_api_key:
+            st.error("Please enter your HuggingFace API Key.")
+            st.stop()
+        llm = HuggingFaceHub(repo_id="mistralai/Mistral-7B-Instruct-v0.1", huggingfacehub_api_token=huggingface_api_key)
+    elif model_option == "Llama":
+        if not huggingface_api_key:
+            st.error("Please enter your HuggingFace API Key.")
+            st.stop()
+        llm = HuggingFaceHub(repo_id="meta-llama/Llama-3.1-8B", huggingfacehub_api_token=huggingface_api_key)
 
     # Define tools
     tools = [
@@ -52,24 +72,16 @@ try:
         verbose=True
     )
 
-    # Set LangChain environment variables
-    if langchain_tracing_v2:
-        os.environ["LANGCHAIN_TRACING_V2"] = "true"
-        os.environ["LANGCHAIN_ENDPOINT"] = langchain_endpoint
-        os.environ["LANGCHAIN_API_KEY"] = langchain_api_key
-        os.environ["LANGCHAIN_PROJECT"] = langchain_project
-
     # User input
-    user_input = st.text_area("Enter your question or code to test:", "")
+    user_input = st.text_area("Enter your Python code or question:", "")
 
     if st.button("Submit"):
         if user_input.strip():
-            st.info("Processing your query...")
+            st.info(f"Processing your query using {model_option}...")
             try:
                 response = agent.run(user_input)
-                formatted_response = response.replace("\\n", "\n")
                 st.success("Agent Response:")
-                st.markdown(f"### Result:\n{formatted_response}")
+                st.markdown(f"### Result:\n{response}")
             except Exception as e:
                 st.error(f"Error processing: {e}")
         else:
@@ -80,9 +92,9 @@ except Exception as e:
 
 st.markdown("""
 ### Features:
-- **LangSmith Integration** for tracking queries and responses.
-- **Python Code Execution** with a REPL tool.
-- **OpenAI Models** with support for GPT-4, GPT-4o and GPT-4o-mini
+- **Multiple Language Models**: Choose between OpenAI GPT-4, AWS Bedrock (Claude), Mistral, and Llama.
+- **Python Code Execution**: Test and debug Python code snippets.
+- **Flexible Querying**: Ask questions or input code for analysis.
 
 ### Security Note:
 - Your API keys are used only for this session and are not stored.
@@ -92,6 +104,7 @@ st.markdown("""
 # Instructions for obtaining API keys
 st.sidebar.markdown("""
 ### How to obtain API keys:
-1. OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
-2. LangChain API Key: [LangChain](https://www.langchain.com/)
+- OpenAI API Key: [OpenAI Platform](https://platform.openai.com/signup)
+- AWS Credentials: [AWS Console](https://aws.amazon.com/)
+- HuggingFace API Key: [HuggingFace](https://huggingface.co/settings/tokens)
 """)
