@@ -1,4 +1,3 @@
-#
 import os
 import streamlit as st
 from dotenv import load_dotenv
@@ -7,7 +6,7 @@ from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.schema import HumanMessage
 from langchain.callbacks import StreamlitCallbackHandler
-from langfuse.callbacks import LangfuseCallbackHandler  # Import Langfuse callback
+from langfuse.callback import LangfuseCallbackHandler  # Corrected import
 
 # Load environment variables
 load_dotenv()
@@ -38,7 +37,7 @@ langchain_tracing_v2 = st.sidebar.checkbox("Enable LangChain Tracing V2")
 
 # Langfuse configuration
 langfuse_api_key = st.sidebar.text_input("Langfuse API Key", type="password")
-langfuse_host = st.sidebar.text_input("Langfuse Host", value="https://api.langfuse.com")
+langfuse_host = st.sidebar.text_input("Langfuse Host", value="https://cloud.langfuse.com")
 
 # Debug mode
 debug_mode = st.sidebar.checkbox("Enable Debug Mode")
