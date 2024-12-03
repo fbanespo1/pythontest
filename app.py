@@ -28,9 +28,6 @@ else:  # AWS Bedrock models
     aws_secret_key = st.sidebar.text_input("AWS Secret Key", type="password")
     aws_region = st.sidebar.text_input("AWS Region", value="us-east-1")
 
-# Debug mode
-debug_mode = st.sidebar.checkbox("Enable Debug Mode")
-
 # Initialize the selected model
 try:
     if model_option == "OpenAI GPT-4":
@@ -47,15 +44,12 @@ try:
         
         if model_option == "AWS Bedrock Claude":
             model_id = "anthropic.claude-v2"
-            model_kwargs = {"temperature": 0.1, "max_tokens_to_sample": 500}
         elif model_option == "AWS Bedrock Mistral":
-            model_id = "mistral.mistral-7b-instruct-v0:2"
-            model_kwargs = {"temperature": 0.1, "max_tokens": 500}
+            model_id = "mistral.mistral-7b-instruct-v0:2"  # Verify this model ID
         elif model_option == "AWS Bedrock Llama":
-            model_id = "meta.llama3-70b-instruct-v1:0"
-            model_kwargs = {"temperature": 0.1, "max_gen_len": 500}
+            model_id = "meta.llama3-70b-instruct-v1:0"  # Verify this model ID
         
-        llm = BedrockChat(model_id=model_id, region_name=aws_region, model_kwargs=model_kwargs)
+        llm = BedrockChat(model_id=model_id, region_name=aws_region)
 
     # Define tools
     tools = [
@@ -87,44 +81,17 @@ try:
                     if model_option == "OpenAI GPT-4":
                         response = agent.run(user_input)
                     else:  # AWS Bedrock models
-                        messages = [HumanMessage(content=f"Analyze and fix this Python code: {user_input}")]
-                        try:
-                            response = llm(messages)
-                            if debug_mode:
-                                st.text("Raw Response:")
-                                st.code(str(response), language="text")
-                            
-                            if hasattr(response, 'content'):
-                                response = response.content
-                            elif isinstance(response, dict) and 'content' in response:
-                                response = response['content']
-                            else:
-                                response = str(response)
-                            
-                            if not response.strip():
-                                st.warning("The model returned an empty response. This might be due to API limitations or the complexity of the query.")
-                        except Exception as e:
-                            st.error(f"Error with Bedrock model: {str(e)}")
-                            if debug_mode:
-                                st.exception(e)
-                            response = ""
-                    
-                    if response.strip():
-                        st.success("Model Response:")
-                        st.markdown(f"### Result:\n{response}")
-                    else:
-                        st.warning("The model did not provide a response. This might be due to API limitations or the complexity of the query.")
+                        response = llm([HumanMessage(content=f"Analyze and fix this Python code: {user_input}")])
+                        response = response.content
+                    st.success("Model Response:")
+                    st.markdown(f"### Result:\n{response}")
             except Exception as e:
                 st.error(f"Error processing: {str(e)}")
-                if debug_mode:
-                    st.exception(e)
         else:
             st.warning("Please enter a query before submitting.")
 
 except Exception as e:
     st.error(f"Error initializing the model: {str(e)}")
-    if debug_mode:
-        st.exception(e)
 
 st.markdown("""
 ### Features:
